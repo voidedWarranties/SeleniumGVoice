@@ -18,7 +18,7 @@ function Client(email, password, number) {
     this._email = email;
     this._password = password;
     this._number = number;
-    this._events = new EventEmitter();
+    this.events = new EventEmitter();
 
     this._mailListener = new MailListener({
         username: email,
@@ -33,21 +33,24 @@ function Client(email, password, number) {
 
     this._mailListener.start();
     this._mailListener.on("server:connected", function(){
-        this._events.emit("emailReady");
     });
       
     this._mailListener.on("server:disconnected", function(){
-        this._events.emit("emailDisconnected");
     });
 
     this._mailListener.on("mail", (mail, seqno, attr) => {
-        if(mail.from[0].address.endsWith("@txt.voice.google.com")) {
+        var from = mail.from[0].address;
+        if(from.endsWith("@txt.voice.google.com")) {
             var regexp = new RegExp("<https://voice.google.com>\r\n.*\r\n");
             var eml = mail.eml;
             var matches = eml.match(regexp);
             var content = matches[0].split("\r\n").join("").replace("<https://voice.google.com>", "");
 
-            this._events.emit("sms", content);
+            var regexp2 = /[0-9]{11}/g;
+            var matches2 = from.match(regexp2);
+            var toNumber = matches2[1];
+
+            this.events.emit("sms", toNumber, content);
         }
     });
 }
@@ -62,10 +65,6 @@ prot.setNumber = async function(number) {
 
     msgBox = await locationPromiseByXPath("//*[@id=\"input_1\"]"); // Find the message box
     await driver.wait(until.elementIsEnabled(msgBox));
-}
-
-prot.getEvents = function() {
-    return this._events;
 }
 
 prot.login = async function() {
@@ -95,7 +94,7 @@ prot.login = async function() {
     msgBox = await locationPromiseByXPath("//*[@id=\"input_1\"]"); // Find the message box
     await driver.wait(until.elementIsEnabled(msgBox));
 
-    this._events.emit("init");
+    this.events.emit("init");
 }
 
 prot.sendSMS = function(msg) {
