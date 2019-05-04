@@ -1,6 +1,6 @@
 {
   "name": "seleniumgvoice",
-  "version": "1.0.0a",
+  "version": "1.0.1",
   "description": "Google Voice automation using Selenium",
   "main": "./src/index.js",
   "scripts": {

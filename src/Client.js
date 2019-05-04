@@ -14,6 +14,9 @@ seleniumOptions.addArguments("--disable-gpu");
 var driver = new Builder().forBrowser("chrome").setChromeOptions(seleniumOptions).build();
 var msgBox;
 
+var sending;
+var queue = [];
+
 function Client(email, password, number) {
     this._email = email;
     this._password = password;
@@ -56,6 +59,7 @@ function Client(email, password, number) {
 }
 
 prot.setNumber = async function(number) {
+    queue = [];
     var sendMsgButon = await locationPromiseByXPath("//*[@id=\"messaging-view\"]/div/md-content/div/div/div");
     await sendMsgButon.click();
 
@@ -94,10 +98,23 @@ prot.login = async function() {
     msgBox = await locationPromiseByXPath("//*[@id=\"input_1\"]"); // Find the message box
     await driver.wait(until.elementIsEnabled(msgBox));
 
+    setInterval(tick, 100);
     this.events.emit("init");
 }
 
-prot.sendSMS = async function(msg) {
+function tick() {
+    if(!sending) {
+        sending = true;
+        sendSMS(queue[0]);
+        queue.shift();
+    }
+}
+
+prot.sendSMS = function(msg) {
+    queue.push(msg);
+}
+
+async function sendSMS(msg) {
     var split = msg.split("\n");
     for(i = 0; i < split.length; i++) {
         if(i === split.length - 1) {
@@ -108,6 +125,7 @@ prot.sendSMS = async function(msg) {
             await msgBox.sendKeys(Key.chord(Key.SHIFT, "\n"));
         }
     }
+    sending = false;
 }
 
 function locationPromiseByName(name) {
