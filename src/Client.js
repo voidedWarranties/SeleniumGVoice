@@ -97,8 +97,17 @@ prot.login = async function() {
     this.events.emit("init");
 }
 
-prot.sendSMS = function(msg) {
-    msgBox.sendKeys(msg, Key.RETURN);
+prot.sendSMS = async function(msg) {
+    var split = msg.split("\n");
+    for(i = 0; i < split.length; i++) {
+        if(i === split.length - 1) {
+            await msgBox.sendKeys(split[i]);
+            await msgBox.sendKeys(Key.chord(Key.SHIFT, "\n"), Key.RETURN);
+        } else {
+            await msgBox.sendKeys(split[i]);
+            await msgBox.sendKeys(Key.chord(Key.SHIFT, "\n"));
+        }
+    }
 }
 
 function locationPromiseByName(name) {
