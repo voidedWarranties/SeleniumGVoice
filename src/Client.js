@@ -104,9 +104,11 @@ prot.login = async function() {
 
 function tick() {
     if(!sending) {
-        sending = true;
-        sendSMS(queue[0]);
-        queue.shift();
+        if(queue[0]) {
+            sending = true;
+            sendSMS(queue[0]);
+            queue.shift();
+        }
     }
 }
 
