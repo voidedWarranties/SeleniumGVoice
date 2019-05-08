@@ -40,14 +40,41 @@ function getNew() {
         }
     }, (err, res, body) => {
         parseString(body, (err, result) => {
-            var messages = JSON.parse(result.response.json[0]).messages;
+            if(result) {
+                var messages = JSON.parse(result.response.json[0]).messages;
 
-            if(messages) {
-                var greatestTime = 0;
-                var latestMessage = {};
-                for(key in messages) {
-                    var message = messages[key];
-                    if(message.id) {
+                if(messages) {
+                    var greatestTime = 0;
+                    var latestMessage = {};
+                    for(key in messages) {
+                        var message = messages[key];
+                        if(message.id) {
+                            request({
+                                method: "POST",
+                                uri: "https://www.google.com/voice/inbox/deleteForeverMessages/",
+                                headers: {
+                                    cookie
+                                },
+                                form: {
+                                    _rnr_se,
+                                    messages: message.id
+                                }
+                            }, (err, res, body) => {
+                                deleting = false;
+                            });
+                        } else {
+                            continue;
+                        }
+
+                        if(Number(message.startTime) > greatestTime && !message.isTrasn) {
+                            greatestTime = message.startTime;
+                            latestMessage = message;
+                        } else {
+                            continue;
+                        }
+                    }
+                    if(latestMessage.labels && latestMessage.labels.indexOf("unread") > -1) {
+                        deleting = true;
                         request({
                             method: "POST",
                             uri: "https://www.google.com/voice/inbox/deleteForeverMessages/",
@@ -56,39 +83,14 @@ function getNew() {
                             },
                             form: {
                                 _rnr_se,
-                                messages: message.id
+                                messages: latestMessage.id
                             }
                         }, (err, res, body) => {
                             deleting = false;
                         });
-                    } else {
-                        continue;
-                    }
-
-                    if(Number(message.startTime) > greatestTime && !message.isTrasn) {
-                        greatestTime = message.startTime;
-                        latestMessage = message;
-                    } else {
-                        continue;
-                    }
-                }
-                if(latestMessage.labels && latestMessage.labels.indexOf("unread") > -1) {
-                    deleting = true;
-                    request({
-                        method: "POST",
-                        uri: "https://www.google.com/voice/inbox/deleteForeverMessages/",
-                        headers: {
-                            cookie
-                        },
-                        form: {
-                            _rnr_se,
-                            messages: latestMessage.id
+                        if(latestMessage !== previousLatest) {
+                            events.emit("sms", latestMessage.phoneNumber, latestMessage.messageText, latestMessage.displayStartDateTime);
                         }
-                    }, (err, res, body) => {
-                        deleting = false;
-                    });
-                    if(latestMessage !== previousLatest) {
-                        events.emit("sms", latestMessage.phoneNumber, latestMessage.messageText, latestMessage.displayStartDateTime);
                     }
                 }
             }
