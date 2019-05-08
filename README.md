@@ -1,5 +1,4 @@
-SUPER NOTE: ALL OF YOUR GOOGLE VOICE MESSAGE HISTORY WILL BE DELETED WHEN THE LIBRARY IS USED.
-This doesn't really matter to me due to the use case, but it might for you!
+#SUPER NOTE: ALL OF YOUR GOOGLE VOICE MESSAGE HISTORY WILL BE DELETED WHEN THE LIBRARY IS USED.
 
 Note: Only tested on Windows
 
