@@ -2,8 +2,9 @@ const { Builder, By, until, Key } = require("selenium-webdriver");
 const chrome = require("selenium-webdriver/chrome");
 const { EventEmitter } = require("events");
 
-const MailListener = require("mail-listener4");
+const parseString = require("xml2js").parseString;
 
+const request = require("request");
 
 var prot = Client.prototype;
 
@@ -12,130 +13,129 @@ seleniumOptions.addArguments("--headless");
 seleniumOptions.addArguments("--disable-gpu");
 
 var driver = new Builder().forBrowser("chrome").setChromeOptions(seleniumOptions).build();
-var msgBox;
 
-var sending;
-var queue = [];
+var cookie, _rnr_se;
 
-function Client(email, password, number) {
+var events;
+
+function Client(email, password) {
     this._email = email;
     this._password = password;
-    this._number = number;
     this.events = new EventEmitter();
-
-    this._mailListener = new MailListener({
-        username: email,
-        password: password,
-        host: "imap.gmail.com",
-        port: 993,
-        tls: true,
-        fetchUnreadOnStart: true,
-        searchFilter: ["UNSEEN", ["SINCE", new Date()]],
-        markSeen: true
-    });
-
-    this._mailListener.start();
-    this._mailListener.on("server:connected", function(){
-    });
-      
-    this._mailListener.on("server:disconnected", function(){
-    });
-
-    this._mailListener.on("mail", (mail, seqno, attr) => {
-        var from = mail.from[0].address;
-        if(from.endsWith("@txt.voice.google.com")) {
-            var regexp = new RegExp("<https://voice.google.com>\r\n.*\r\n");
-            var eml = mail.eml;
-            var matches = eml.match(regexp);
-            var content = matches[0].split("\r\n").join("").replace("<https://voice.google.com>", "");
-
-            var regexp2 = /[0-9]{11}/g;
-            var matches2 = from.match(regexp2);
-            var toNumber = matches2[1];
-
-            this.events.emit("sms", toNumber, content);
-        }
-    });
+    events = this.events;
 }
 
-prot.setNumber = async function(number) {
-    queue = [];
-    var sendMsgButon = await locationPromiseByXPath("//*[@id=\"messaging-view\"]/div/md-content/div/div/div");
-    await sendMsgButon.click();
+var requesting;
+var deleting;
+var previousLatest;
 
-    var toField = await locationPromiseByXPath("//*[@id=\"input_0\"]");
-    await driver.wait(until.elementIsEnabled(toField));
-    await toField.sendKeys(number, Key.RETURN);
+function getNew() {
+    if(requesting || deleting) return;
+    requesting = true;
+    request({
+        method: "GET",
+        uri: "https://www.google.com/voice/inbox/recent/sms/",
+        headers: {
+            cookie
+        }
+    }, (err, res, body) => {
+        parseString(body, (err, result) => {
+            var messages = JSON.parse(result.response.json[0]).messages;
 
-    msgBox = await locationPromiseByXPath("//*[@id=\"input_1\"]"); // Find the message box
-    await driver.wait(until.elementIsEnabled(msgBox));
+            if(messages) {
+                var greatestTime = 0;
+                var latestMessage = {};
+                for(key in messages) {
+                    var message = messages[key];
+                    if(message.id) {
+                        request({
+                            method: "POST",
+                            uri: "https://www.google.com/voice/inbox/deleteForeverMessages/",
+                            headers: {
+                                cookie
+                            },
+                            form: {
+                                _rnr_se,
+                                messages: message.id
+                            }
+                        }, (err, res, body) => {
+                            deleting = false;
+                        });
+                    } else {
+                        continue;
+                    }
+
+                    if(Number(message.startTime) > greatestTime && !message.isTrasn) {
+                        greatestTime = message.startTime;
+                        latestMessage = message;
+                    } else {
+                        continue;
+                    }
+                }
+                if(latestMessage.labels && latestMessage.labels.indexOf("unread") > -1) {
+                    deleting = true;
+                    request({
+                        method: "POST",
+                        uri: "https://www.google.com/voice/inbox/deleteForeverMessages/",
+                        headers: {
+                            cookie
+                        },
+                        form: {
+                            _rnr_se,
+                            messages: latestMessage.id
+                        }
+                    }, (err, res, body) => {
+                        deleting = false;
+                    });
+                    if(latestMessage !== previousLatest) {
+                        events.emit("sms", latestMessage.phoneNumber, latestMessage.messageText, latestMessage.displayStartDateTime);
+                    }
+                }
+            }
+        });
+        requesting = false;
+    });
 }
 
 prot.login = async function() {
-    await driver.get("https://voice.google.com");
-    await driver.findElement(By.className("signUpLink")).click();
+    await driver.get("https://accounts.google.com/ServiceLogin?service=grandcentral&continue=https://www.google.com/voice/b/0/redirection/voice&followup=https://www.google.com/voice/b/0/redirection/voice#inbox");
     await driver.wait(until.titleIs("Google Voice"));
     await driver.findElement(By.name("Email")).sendKeys(this._email, Key.RETURN);
 
-    var passfield = await locationPromiseByName("Passwd"); // Find the passworld field and wait until it is visible
+    var passfield = await locationPromiseByName("Passwd"); // Find the password field and wait until it is visible
     await visibilityPromise(passfield);
     await passfield.sendKeys(this._password, Key.RETURN);
 
-    var msgButton = await locationPromiseByXPath("//*[@id=\"gvPageRoot\"]/div[2]/div[2]/gv-side-nav/div/div/gmat-nav-list/a[2]"); // Find the message button
-    await visibilityPromise(msgButton);
-    await msgButton.click();
+    _rnr_se = await driver.executeScript("return document.getElementsByTagName(\"input\")._rnr_se.value");
 
-    var convo = await locationPromiseByXPath("//*[@id=\"messaging-view\"]/div/md-content/div/gv-conversation-list/md-virtual-repeat-container/div/div[2]/div/div/gv-text-thread-item"); // Find my phone number
-    await visibilityPromise(convo);
+    var NID = await driver.manage().getCookie("NID");
+    var HSID = await driver.manage().getCookie("HSID");
+    var SSID = await driver.manage().getCookie("SSID");
 
-    var sendMsgButon = await locationPromiseByXPath("//*[@id=\"messaging-view\"]/div/md-content/div/div/div");
-    await sendMsgButon.click();
+    cookie = (await driver.executeScript("return document.cookie")) + "; NID=" + NID.value + "; HSID=" + HSID.value + "; SSID=" + SSID.value + ";";
 
-    var toField = await locationPromiseByXPath("//*[@id=\"input_0\"]");
-    await driver.wait(until.elementIsEnabled(toField));
-    await toField.sendKeys(this._number, Key.RETURN);
-
-    msgBox = await locationPromiseByXPath("//*[@id=\"input_1\"]"); // Find the message box
-    await driver.wait(until.elementIsEnabled(msgBox));
-
-    setInterval(tick, 100);
+    setInterval(getNew, 500);
     this.events.emit("init");
 }
 
-function tick() {
-    if(!sending) {
-        if(queue[0]) {
-            sending = true;
-            sendSMS(queue[0]);
-            queue.shift();
+prot.sendSMS = function(number, msg) {
+    request({
+        method: "POST",
+        uri: "https://www.google.com/voice/sms/send/",
+        headers: {
+            cookie
+        },
+        form: {
+            phoneNumber: "+1" + number,
+            text: msg,
+            _rnr_se
         }
-    }
-}
-
-prot.sendSMS = function(msg) {
-    queue.push(msg);
-}
-
-async function sendSMS(msg) {
-    var split = msg.split("\n");
-    for(i = 0; i < split.length; i++) {
-        if(i === split.length - 1) {
-            await msgBox.sendKeys(split[i]);
-            await msgBox.sendKeys(Key.chord(Key.SHIFT, "\n"), Key.RETURN);
-        } else {
-            await msgBox.sendKeys(split[i]);
-            await msgBox.sendKeys(Key.chord(Key.SHIFT, "\n"));
-        }
-    }
-    sending = false;
+    }, (err, res, body) => {
+    });
 }
 
 function locationPromiseByName(name) {
     return driver.wait(until.elementLocated(By.name(name)));
-}
-
-function locationPromiseByXPath(xpath) {
-    return driver.wait(until.elementLocated(By.xpath(xpath)));
 }
 
 function visibilityPromise(el) {

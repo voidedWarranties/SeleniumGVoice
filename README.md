@@ -1,24 +1,24 @@
+SUPER NOTE: ALL OF YOUR GOOGLE VOICE MESSAGE HISTORY WILL BE DELETED WHEN THE LIBRARY IS USED.
+This doesn't really matter to me due to the use case, but it might for you!
+
 Note: Only tested on Windows
 
 Prerequisites:
 1. Have Chrome 75 installed, or replace the WebDriver for the correct version
-2. Have Google Voice set up with at least one SMS conversation and with messages forwarding to your email account.
-3. Have 2FA disabled for your GVoice account.
+2. Have 2FA disabled for your GVoice account.
 
 Basic Example:
 
 ```javascript
 const { Client } = require("seleniumgvoice");
-var client = new Client("gmail username", "gmail password", "inital number to SMS");
+var client = new Client("gmail username", "gmail password");
 client.events.on("init", () => {
     console.log("Ready");
-    client.sendSMS("Hello World");
-    client.setNumber("1234567890");
-    client.sendSMS("Hello World");
+    client.sendSMS("1234567890", "Hello World"); // Don't include country code
 });
 
-client.events.on("sms", (number, sms) => { // Number gets the country code added to it (8304765664 -> 18304765664)
-    console.log(number, sms);
+client.events.on("sms", (number, sms, time) => { // Number gets the country code added to it (8304765664 -> +18304765664)
+    console.log(number, sms, time);
 });
 
 client.login(); // Do AFTER registering all events
