@@ -40,7 +40,7 @@ function getNew() {
         }
     }, (err, res, body) => {
         parseString(body, (err, result) => {
-            if(result) {
+            if(result && result.json) {
                 var messages = JSON.parse(result.response.json[0]).messages;
 
                 if(messages) {
@@ -108,8 +108,10 @@ prot.login = async function() {
     await visibilityPromise(passfield);
     await passfield.sendKeys(this._password, Key.RETURN);
 
-    _rnr_se = await driver.executeScript("return document.getElementsByTagName(\"input\")._rnr_se.value");
+    await driver.sleep(10000);
 
+    _rnr_se = await driver.executeScript("return document.getElementsByTagName(\"input\")._rnr_se.value");
+    
     var NID = await driver.manage().getCookie("NID");
     var HSID = await driver.manage().getCookie("HSID");
     var SSID = await driver.manage().getCookie("SSID");
