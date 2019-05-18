@@ -40,7 +40,7 @@ function getNew() {
         }
     }, (err, res, body) => {
         parseString(body, (err, result) => {
-            if(result && result.json) {
+            if(result && result.response.json) {
                 var messages = JSON.parse(result.response.json[0]).messages;
 
                 if(messages) {
